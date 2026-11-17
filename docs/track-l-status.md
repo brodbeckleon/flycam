@@ -10,7 +10,7 @@ Toolchain used: Swift 6.4.2 (swift.org release for Ubuntu 26.04), Python 3.12 vi
 | 1 | Packages/FlyCamKit: pure-Swift core | done | see below |
 | 2 | Tools/ Python tools | done | see below |
 | 3 | Tools/simulator | done | see below |
-| 4 | Tools/prototype | todo | |
+| 4 | Tools/prototype | done | see below |
 | 5 | Golden files Swift <-> Python | todo | |
 | 6 | docs/protocol.md, docs/manual-tests.md | in progress | protocol.md written |
 
@@ -66,3 +66,43 @@ Decisions taken while building (also in code comments):
 
 Not covered here: Wi-Fi behaviour, Bonjour discovery, VideoToolbox encoder settings, real latency and
 sync numbers (docs/manual-tests.md, Phase 5).
+
+## 4. Prototype
+
+`Tools/prototype/transition.py` (`uv run python -m prototype.transition out/synth --out out/prototype`)
+renders a take from cam0 to cam1 on a synthetic dataset and writes `transition_<mode>.mp4` (H.264) plus a
+per-frame JSON (time, u, s, blend weights, virtual c2w) for three modes:
+
+- `static`: static scene only (Phase 4). The analytic scene without the person stands in for the splat.
+- `billboard`: Phase 6. Floor-contact anchor, vertical plane facing the virtual camera, projective texture from
+  the source frame and feathered matte, depth test against the static depth, A weighted 1 - s, B weighted s.
+- `gaussians`: Phase 7. Monocular depth aligned per frame to the static depth (RANSAC + Huber, smoothed),
+  anchor check against floor contact (15 %), one point per 2 x 2 pixels, discontinuities dropped,
+  opaque discs with z-buffer, inflated up to 1.4x in mid-flight.
+
+The path is rebuilt each frame from the latest poses using the same algorithm as FlyCamKit. Inputs are what
+the Mac would have: the decoded HEVC video, person masks (in place of Vision), and the simulated monocular
+depth (in place of Depth Anything).
+
+Measured (test dataset, 384x216). The thresholds are stated in `tests/test_prototype.py`:
+
+| Check | Threshold | Measured |
+|---|---|---|
+| render vs. source frame at s = 0 / s = 1, billboard | >= 33 dB | 34.99 / 35.26 dB |
+| same, Gaussians | >= 28 dB | 30.24 / 30.45 dB |
+| same, static (background pixels) | >= 33 dB | 35.06 / 35.48 dB |
+| program output before take / after landing | identical to video | identical |
+| MP4 frames at take and landing vs. source | >= 35 dB | passes |
+| person bottom edge vs. ground truth during flight | <= 4 px | 0-2 px |
+| silhouette IoU vs. ground truth, Gaussians / billboards | >= 0.75 and > billboards + 0.1 | 0.85 / 0.64 (mean) |
+| depth anchor check agrees | >= 90 % of frames | 71 / 71 |
+
+Decisions:
+
+- People layers for Gaussians use a coverage-normalised blend (colour = sum(w a c) / sum(w a), alpha = max(w a) / max(w)).
+  Each camera only sees one side of a person, and the plain (1 - s, s) sum showed two half-transparent halves
+  at mid-flight. Billboards keep the plain weighted sum because the union doubled their outline. Both blends are
+  exact at s = 0 and s = 1.
+- In the synthetic data the monocular depth scale now drifts slowly over time. With a large per-frame change,
+  smoothing a and b (as Phase 7 asks) produced wrong depth.
+- Flight times within 1 us of 0 or T are snapped, so timestamp rounding cannot turn the landing frame into a mix.

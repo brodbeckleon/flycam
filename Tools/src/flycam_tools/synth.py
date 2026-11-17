@@ -90,8 +90,9 @@ def scan_poses(n: int) -> list[np.ndarray]:
 
 def mono_depth(depth: np.ndarray, k: int, rng: np.random.Generator) -> tuple[np.ndarray, float, float]:
     """Simulated monocular relative inverse depth d with 1/z = a*d + b (plus noise, outliers)."""
-    a = 0.05 * (1 + 0.15 * math.sin(0.7 * k))
-    b = 0.02 + 0.01 * math.cos(0.3 * k)
+    # Scale and shift drift slowly (video depth models are temporally fairly stable).
+    a = 0.05 * (1 + 0.15 * math.sin(0.07 * k))
+    b = 0.02 + 0.01 * math.cos(0.05 * k)
     inv = 1.0 / depth
     d = (inv - b) / a
     h, w = depth.shape
