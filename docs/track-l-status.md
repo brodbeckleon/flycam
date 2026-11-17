@@ -9,7 +9,7 @@ Toolchain used: Swift 6.4.2 (swift.org release for Ubuntu 26.04), Python 3.12 vi
 |---|---|---|---|
 | 1 | Packages/FlyCamKit: pure-Swift core | done | see below |
 | 2 | Tools/ Python tools | done | see below |
-| 3 | Tools/simulator | todo | |
+| 3 | Tools/simulator | done | see below |
 | 4 | Tools/prototype | todo | |
 | 5 | Golden files Swift <-> Python | todo | |
 | 6 | docs/protocol.md, docs/manual-tests.md | in progress | protocol.md written |
@@ -48,3 +48,21 @@ Decisions taken while building (also in code comments):
 - SIFT contrast threshold 0.02 instead of OpenCV's 0.04: the default found only about 40 keypoints per 384x216 frame.
 - PnP RANSAC threshold 1 px: at 2 px the rotation error was 0.055 deg on cam0, at 1 px 0.02-0.03 deg on both cameras.
 - Render depth exchange format for the DirectorApp: raw little-endian float32 `.f32`, H x W, depth along the viewing axis (documented in `refine.py`).
+
+## 3. Simulator
+
+- `Tools/simulator/fake_phone.py`: plays a session folder like CaptureApp in live mode: control connection
+  (hello, pong with its own clock, acks, status every second), media connection with one packet per frame
+  (header from frames.jsonl, HEVC access unit from video.mov with VPS/SPS/PPS on keyframes), real-time pacing.
+- `Tools/simulator/receiver.py`: reference Mac side: one port, preamble dispatch, camera id assignment
+  (stable per device id), 10 pings at connect then 1/s, min-RTT offset, low-delay HEVC decode, Mac-time frame store,
+  nearest-frame pairing. Rejects bad preambles and media before hello without stopping.
+- `Tools/src/flycam_tools/hevc.py`: access units from `.mov`, hvcC parsing, wire payload decoder.
+- `Tools/tests/test_simulator.py` (localhost, two phones with clock offsets -4000 s and +1234.5 s):
+  all frames in order, decoded frames bit-identical to the file, poses equal frames.jsonl at float32 precision,
+  offset estimate within 2 ms of truth (measured: about 0.01 ms), latency = simulated 30 ms capture delay +-5 ms,
+  pairing within half a frame interval, set_camera_settings / start_recording / stop_recording acknowledged,
+  start_recording carries the offset estimate. Ran 6 times in a row without a failure.
+
+Not covered here: Wi-Fi behaviour, Bonjour discovery, VideoToolbox encoder settings, real latency and
+sync numbers (docs/manual-tests.md, Phase 5).
