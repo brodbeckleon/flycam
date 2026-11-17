@@ -96,6 +96,15 @@ public struct Mat4: Equatable, Sendable {
 
     public static let identity = Mat4(columnMajor: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
 
+    /// Camera-to-world at `eye` whose -Z axis points at `target` (ARKit camera convention).
+    /// Same formula as `look_at` in Tools/flycam_tools/geometry.py.
+    public static func lookAt(eye: Vec3, target: Vec3, up: Vec3 = .unitY) -> Mat4 {
+        let back = (eye - target).normalized
+        let right = up.cross(back).normalized
+        let camUp = back.cross(right)
+        return Mat4(rotation: Mat3(columns: right, camUp, back), translation: eye)
+    }
+
     public static func == (a: Mat4, b: Mat4) -> Bool {
         a.columnMajor == b.columnMajor
     }

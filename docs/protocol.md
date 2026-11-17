@@ -318,3 +318,13 @@ Both test suites read **both** directories and check:
 
 Each suite also checks that regenerating its own directory gives the committed files
 byte for byte, so the golden files cannot silently go stale.
+
+### 6.1 JSON pitfalls found while building the golden files
+
+- **Negative zero.** Swift's `JSONEncoder` and `JSONSerialization` write `-0.0` as `-0`, which Swift
+  and Python both read back as `+0`. Numerically irrelevant in `frames.jsonl`, but a JSON description
+  of a binary packet cannot carry `-0.0`. The Swift golden generator therefore normalises it to `+0`.
+- **Parsing doubles on Linux.** On Linux (swift-corelibs-foundation, Swift 6.4.2), `JSONSerialization`
+  parses about half of all doubles to a neighbouring value (`0.9845625162124634` becomes
+  `0.9845625162124637`). `JSONDecoder` is correctly rounded. FlyCamKit parses all JSON with
+  `JSONDecoder`; do not use `JSONSerialization` to read numbers in shared code.

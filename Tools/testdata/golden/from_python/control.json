@@ -1,0 +1,67 @@
+{
+ "messages": [
+  {
+   "device_id": "A1B2-C3",
+   "device_model": "iPhone15,2",
+   "os_version": "18.1",
+   "protocol_version": 1,
+   "type": "hello",
+   "video_format": {
+    "fps": 60,
+    "height": 1080,
+    "width": 1920
+   }
+  },
+  {
+   "camera_id": 2,
+   "protocol_version": 1,
+   "type": "hello_ack"
+  },
+  {
+   "seq": 7,
+   "t1": 100.25,
+   "type": "ping"
+  },
+  {
+   "seq": 7,
+   "t1": 100.25,
+   "t2": 5000.5,
+   "t3": 5000.5001,
+   "type": "pong"
+  },
+  {
+   "battery": 0.8,
+   "fps": 59.9,
+   "recording": false,
+   "thermal_state": "fair",
+   "tracking": "limited",
+   "type": "status"
+  },
+  {
+   "message": "device busy",
+   "ok": false,
+   "ref": "set_camera_settings",
+   "type": "ack"
+  },
+  {
+   "iso": 200.0,
+   "lock": true,
+   "shutter": 0.008333333333333333,
+   "type": "set_camera_settings",
+   "wb_temperature": 5200.0,
+   "wb_tint": -3.0
+  },
+  {
+   "lock": false,
+   "type": "set_camera_settings"
+  },
+  {
+   "clock_offset": -4321.5,
+   "session_name": "session_2026-11-17_cam0",
+   "type": "start_recording"
+  },
+  {
+   "type": "stop_recording"
+  }
+ ]
+}

@@ -1,0 +1,60 @@
+{
+  "messages" : [
+    {
+      "device_id" : "SWIFT-01",
+      "device_model" : "iPhone16,1",
+      "os_version" : "18.2",
+      "protocol_version" : 1,
+      "type" : "hello",
+      "video_format" : {
+        "fps" : 30,
+        "height" : 1440,
+        "width" : 1920
+      }
+    },
+    {
+      "camera_id" : 0,
+      "protocol_version" : 1,
+      "type" : "hello_ack"
+    },
+    {
+      "seq" : 1,
+      "t1" : 77.125,
+      "type" : "ping"
+    },
+    {
+      "seq" : 1,
+      "t1" : 77.125,
+      "t2" : 9001.25,
+      "t3" : 9001.2505,
+      "type" : "pong"
+    },
+    {
+      "battery" : 0.55,
+      "fps" : 29.97,
+      "recording" : true,
+      "thermal_state" : "serious",
+      "tracking" : "normal",
+      "type" : "status"
+    },
+    {
+      "ok" : true,
+      "ref" : "start_recording",
+      "type" : "ack"
+    },
+    {
+      "iso" : 64,
+      "lock" : true,
+      "shutter" : 0.004,
+      "type" : "set_camera_settings"
+    },
+    {
+      "clock_offset" : 321.0625,
+      "session_name" : "session_swift",
+      "type" : "start_recording"
+    },
+    {
+      "type" : "stop_recording"
+    }
+  ]
+}

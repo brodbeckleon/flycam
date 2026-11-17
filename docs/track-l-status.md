@@ -11,7 +11,7 @@ Toolchain used: Swift 6.4.2 (swift.org release for Ubuntu 26.04), Python 3.12 vi
 | 2 | Tools/ Python tools | done | see below |
 | 3 | Tools/simulator | done | see below |
 | 4 | Tools/prototype | done | see below |
-| 5 | Golden files Swift <-> Python | todo | |
+| 5 | Golden files Swift <-> Python | done | see below |
 | 6 | docs/protocol.md, docs/manual-tests.md | in progress | protocol.md written |
 
 ## 1. FlyCamKit
@@ -106,3 +106,19 @@ Decisions:
 - In the synthetic data the monocular depth scale now drifts slowly over time. With a large per-frame change,
   smoothing a and b (as Phase 7 asks) produced wrong depth.
 - Flight times within 1 us of 0 or T are snapped, so timestamp rounding cannot turn the landing frame into a mix.
+
+## 5. Golden files
+
+`Tools/testdata/golden/from_python/` (written by `Tools/make_golden.py`) and `Tools/testdata/golden/from_swift/`
+(written by `swift run flycam-golden`, target `FlyCamGoldenSupport`). Each set has media packets (binary and JSON),
+control messages, a session (`meta.json`, `frames.jsonl`), camera projection cases, transition paths at 7 values of s
+(5 cases Python, 4 cases Swift, covering every interest-point fallback, the floor guard, zoom and resolution change,
+antiparallel cameras) and a clock estimation case.
+
+Both suites verify both sets: packets decode to the JSON and re-encode byte for byte; control and session files are
+equal by value; the transition, camera and clock values agree within 1e-9; s = 0 and s = 1 are bit-exact.
+Each suite also checks that regenerating its own set reproduces the committed bytes, and that its verifier catches a
+flipped bit and a wrong method name.
+
+Findings (docs/protocol.md 6.1): Swift writes -0.0 as `-0` (the sign is lost on reading), and `JSONSerialization` on
+Linux mis-parses about half of all doubles, so the Swift verifier reads JSON with `JSONDecoder`.

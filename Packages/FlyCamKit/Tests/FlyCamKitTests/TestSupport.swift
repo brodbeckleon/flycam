@@ -20,10 +20,7 @@ struct SeededRNG: RandomNumberGenerator {
 
 /// c2w looking from `eye` towards `target` with world +Y up (ARKit convention: camera -Z looks at target).
 func lookAt(eye: Vec3, target: Vec3, up: Vec3 = .unitY) -> Mat4 {
-    let back = (eye - target).normalized          // camera +Z
-    let right = up.cross(back).normalized          // camera +X
-    let camUp = back.cross(right)                  // camera +Y
-    return Mat4(rotation: Mat3(columns: right, camUp, back), translation: eye)
+    Mat4.lookAt(eye: eye, target: target, up: up)
 }
 
 func randomRotation(_ rng: inout SeededRNG) -> Mat3 {

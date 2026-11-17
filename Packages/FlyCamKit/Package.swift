@@ -10,7 +10,9 @@ let package = Package(
     ],
     targets: [
         .target(name: "FlyCamKit"),
-        .executableTarget(name: "FlyCamGolden", dependencies: ["FlyCamKit"]),
-        .testTarget(name: "FlyCamKitTests", dependencies: ["FlyCamKit"]),
+        // Golden files shared with Tools/ (docs/protocol.md section 6). Not part of the apps.
+        .target(name: "FlyCamGoldenSupport", dependencies: ["FlyCamKit"]),
+        .executableTarget(name: "FlyCamGolden", dependencies: ["FlyCamKit", "FlyCamGoldenSupport"]),
+        .testTarget(name: "FlyCamKitTests", dependencies: ["FlyCamKit", "FlyCamGoldenSupport"]),
     ]
 )
