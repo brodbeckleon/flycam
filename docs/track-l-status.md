@@ -12,7 +12,7 @@ Toolchain used: Swift 6.4.2 (swift.org release for Ubuntu 26.04), Python 3.12 vi
 | 3 | Tools/simulator | done | see below |
 | 4 | Tools/prototype | done | see below |
 | 5 | Golden files Swift <-> Python | done | see below |
-| 6 | docs/protocol.md, docs/manual-tests.md | in progress | protocol.md written |
+| 6 | docs/protocol.md, docs/manual-tests.md | done | also docs/log.md |
 
 ## 1. FlyCamKit
 
@@ -122,3 +122,38 @@ flipped bit and a wrong method name.
 
 Findings (docs/protocol.md 6.1): Swift writes -0.0 as `-0` (the sign is lost on reading), and `JSONSerialization` on
 Linux mis-parses about half of all doubles, so the Swift verifier reads JSON with `JSONDecoder`.
+
+## 6. Documentation
+
+- `docs/protocol.md`: conventions, session folder, `meta.json`, `frames.jsonl`, `points.ply`, `pose_override.json`,
+  render depth `.f32`, control and media channels byte by byte, clock sync, frame pairing, Nerfstudio export,
+  golden files and the JSON pitfalls found.
+- `docs/manual-tests.md`: per phase (0-9) what to test on the Mac, iPhones and in the real room, with pass criteria,
+  including every **Verify** item of plan.md and interop tests against the simulator.
+- `docs/log.md`: container measurements and decisions, dated.
+
+## Constraints
+
+- No file under `Packages/` or `Tools/` imports ARKit, Metal, MetalKit, SwiftUI, AVFoundation, VideoToolbox, CoreML,
+  Vision or Network (checked with the grep from the task).
+- CaptureApp and DirectorApp are not written.
+- plan.md is not edited and no "Done when" is ticked: every one of them needs a phone, a Mac or the real room
+  (docs/manual-tests.md lists the matching tests).
+- No test was deleted, skipped or loosened. Thresholds are stated in the tests and in this file.
+
+## Blocked items
+
+None. Everything in Track L scope was built and verified in the container.
+Out of scope by definition and listed in docs/manual-tests.md: device behaviour (ARKit, VideoToolbox, Metal,
+Vision, Core ML, Network.framework), real latency/sync, splat training quality, real-room accuracy.
+
+## How to reproduce
+
+```
+# Swift 6.x toolchain (here: swift.org 6.4.2 for Ubuntu 26.04 in /opt/swift)
+cd Packages/FlyCamKit && swift build && swift test
+swift run flycam-golden            # regenerates Tools/testdata/golden/from_swift
+cd Tools && uv run pytest          # about 3 minutes, generates a synthetic dataset
+uv run python make_golden.py       # regenerates Tools/testdata/golden/from_python
+uv run python synth.py --out out/synth && uv run python -m prototype.transition out/synth --out out/prototype
+```

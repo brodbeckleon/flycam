@@ -157,6 +157,13 @@ Nerfstudio `transforms.json` references it as `ply_file_path`.
 
 When present, a fixed phone uses this pose instead of the per-frame ARKit pose (plan Phase 3).
 
+### 2.5a Render depth for pose refinement (`.f32`)
+
+Exported by the DirectorApp for `Tools/refine_pose.py` (plan Phase 3), next to a colour render
+(`.png`) of the same size: raw little-endian float32, row-major, H x W values, no header,
+depth along the viewing axis in metres for the reported pose and intrinsics, 0 or non-finite
+where the splat has no content.
+
 ### 2.6 `ground_truth/` (synthetic sessions only)
 
 Written by `Tools/synth.py`; never produced by a phone.
