@@ -11,7 +11,8 @@ Branch `track-m`, merged with `origin/track-l` before every scope item.
 | 4 | Transition + `director-cli render-transition` | done | test (c); headless CLI run in test_mac.sh |
 | 5a | CaptureApp: code, iOS build, phone-side logic tested on the Mac | done | |
 | 5b | CaptureApp: behaviour on an iPhone (ARKit, camera lock, recording, scan, relocalisation, export) | blocked | needs an iPhone and the real room; never installed on a device from this track (docs/track-m/manual-tests.md, Phases 0, 1, 3) |
-| 6 | Streaming | todo | |
+| 6a | Streaming: encoder, packets, control channel, clock sync, decoder, frame store, LiveSource, loopback test | done | test (d) |
+| 6b | Streaming: Bonjour discovery between devices, Wi-Fi latency / sync, 15 min stability | blocked | needs the phones, the access point and the real room; Bonjour is not exercised by automated tests because advertising may trigger the macOS local network permission prompt (a GUI window) |
 | 7 | docs/track-m/manual-tests.md | todo | |
 
 ## 1. Skeleton
@@ -150,3 +151,52 @@ iOS 18 app `Apps/CaptureApp` (SwiftUI), built with `scripts/build_ios.sh` (gener
 Tested on the Mac (`CaptureLogicTests`, the same source files as the app): ARKit matrix/intrinsics conversion,
 keyframe rule (10 cm, 8 degrees, fast rotation, tracking), floor choice, points.ply format and round trip, naming,
 video format choice, a recorded clip session opens as `RecordedSource` with the right frames, scan session files.
+
+## 6. Streaming (Phase 5)
+
+Shared (`Apps/Shared/Streaming`, compiled into CaptureApp and DirectorCore):
+
+- `HEVCEncoder`: `VTCompressionSession`, HEVC Main, real-time, frame reordering off, keyframe every 1 s (configurable),
+  15 Mbit/s at 1080p (scaled), Rec. 709 tags, forced keyframe on connect / after drops. Output = wire payload
+  (4-byte big-endian length-prefixed NAL units, VPS/SPS/PPS first on keyframes, docs/protocol.md 3.3).
+- `HEVCDecoder`: format description from the in-band parameter sets, `VTDecompressionSession` to Metal-compatible
+  32BGRA buffers (then `CVMetalTextureCache` in DirectorCore), waits for the first keyframe.
+- `PhoneStreamClient`: Network.framework TCP, control connection (`FCC1`, hello, pong with phone clock t2/t3, status,
+  acks), media connection (`FCM1`) opened after hello_ack, backlog limit with keyframe request. `ServiceBrowser`:
+  `NWBrowser` for `_flycam._tcp`.
+- CaptureApp `StreamingController`: Bonjour browse, encodes `capturedImage`, header from ARFrame (pose, intrinsics,
+  tracking), applies `set_camera_settings`, starts/stops recording with the Mac's session name and clock offset
+  (written to meta.json), status every second (battery, thermal, tracking, fps, recording).
+
+Mac (`Apps/DirectorCore/Streaming`):
+
+- `DirectorServer`: `NWListener` on one port, Bonjour `_flycam._tcp`, preamble dispatch (FlyCamKit parsers), stable
+  camera id per device id, 10 pings at connect then 1 per second, FlyCamKit `ClockOffsetEstimator` (min RTT of the last
+  60), decode, FlyCamKit `FrameStore` (0.5 s per camera, playout delay 150 ms, nearest-frame pairing with residual),
+  frames that arrive before the first clock sample are held until it exists, push camera settings to all, synchronised
+  start/stop recording. Rejects media for unknown cameras and bad preambles without stopping.
+- `LiveSource`: FrameSource over the frame store (Mac clock), optional frozen pose for fixed phones.
+- DirectorApp: program view (MTKView, `ProgramRenderer` live), preview/take (space), recorded sessions and live cameras,
+  splat viewer with orbit camera and explicit intrinsics (Phase 0), camera status, record on all phones, push camera
+  settings (values entered by the operator).
+
+Test (d) (`LoopbackStreamingTests`, localhost, no Bonjour), 90 frames 640x360 at 60 fps real-time pacing, content =
+synthetic room renders with the frame index stamped, phone clock = Mac clock - 1234.5 s, moving pose, changing tracking:
+
+| Check | Threshold | Measured |
+|---|---|---|
+| frames delivered | all 90, in order | 90/90 |
+| header of every frame equal to the sent header (all fields, timestamp bit-identical) | exact | passes |
+| Mac time = phone time + applied offset; applied offset vs. true offset | exact; < 2 ms | passes; about 0.01-0.03 ms |
+| decoded frame identity (stamped index) | every frame | passes |
+| decoded vs. source frame | > 30 dB | worst 43.6 dB |
+| first frame keyframe with VPS/SPS/PPS, keyframe cadence | yes | passes |
+| LiveSource: 0.5 s window, nearest frame, pose and intrinsics from the header | | passes |
+| control: set_camera_settings, start_recording (name, offset), stop_recording, acks, status, >= 10 pongs | | passes |
+| second test: stable camera ids per device across reconnects, media before hello and bad preamble rejected | | passes |
+
+Finding: a synthetic pattern with saturated 16 px red/blue checks decoded at 23.7 dB with no colour bias (4:2:0 chroma
+subsampling); the camera-like room content decodes at 43.6 dB, so the test uses room renders.
+
+Requests for track-l (not blocking): the control protocol has no message that reports a phone's current camera
+settings, so "push one phone's settings to all" needs the operator to enter the values.

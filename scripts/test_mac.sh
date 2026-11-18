@@ -18,7 +18,7 @@ WORK="$ROOT/Apps/.build/cli-smoke"
 rm -rf "$WORK"
 mkdir -p "$WORK"
 echo "== director-cli make-fixture"
-"$CLI" make-fixture "$WORK/fixture" --frames 60 --fps 30
+"$CLI" make-fixture "$WORK/fixture" --frames 75 --fps 30
 echo "== director-cli render-transition"
 "$CLI" render-transition "$WORK/fixture/session_synth_A" "$WORK/fixture/session_synth_B" \
     "$WORK/fixture/splat.ply" --out "$WORK/transition.mp4"
