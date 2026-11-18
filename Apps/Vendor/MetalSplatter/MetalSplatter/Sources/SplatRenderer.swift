@@ -28,7 +28,7 @@ public final class SplatRenderer: @unchecked Sendable {
     }
 
     private static let log =
-        Logger(subsystem: Bundle.module.bundleIdentifier!,
+        Logger(subsystem: "com.metalsplatter.MetalSplatter", // FlyCam patch: no resource bundle
                category: "SplatRenderer")
 
     public struct ViewportDescriptor {
@@ -292,33 +292,18 @@ public final class SplatRenderer: @unchecked Sendable {
 
         self.accessState = Mutex(AccessState())
 
-        // FlyCam patch (VENDORED.md): use a precompiled library when the package was built with the
-        // Metal toolchain, otherwise compile the bundled shader sources at runtime.
-        if let precompiled = try? device.makeDefaultLibrary(bundle: Bundle.module) {
-            library = precompiled
-        } else {
-            library = try Self.makeRuntimeLibrary(device: device)
-        }
+        // FlyCam patch (VENDORED.md): compile the embedded upstream shader sources at runtime.
+        library = try Self.makeRuntimeLibrary(device: device)
     }
 
-    /// Shader files in dependency order. Local `#include`/`#import` lines are dropped because the
-    /// files are concatenated into one translation unit.
-    static let runtimeShaderFiles = [
-        "ShaderCommon.h", "SplatProcessing.h", "SplatProcessing.metal",
-        "SingleStageRenderPath.metal", "MultiStageRenderPath.metal",
-    ]
-
-    public static func runtimeShaderSource() throws -> String {
+    /// Upstream shader files concatenated into one translation unit; local `#include`/`#import`
+    /// lines are dropped because the included files precede their users.
+    public static func runtimeShaderSource() -> String {
         var out = ""
-        for name in runtimeShaderFiles {
-            guard let url = Bundle.module.url(forResource: name, withExtension: "txt", subdirectory: "Shaders") else {
-                throw NSError(domain: "MetalSplatter", code: 1,
-                              userInfo: [NSLocalizedDescriptionKey: "missing shader source \(name)"])
-            }
-            let text = try String(contentsOf: url, encoding: .utf8)
+        for (_, text) in EmbeddedShaderSources.files {
             for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
                 let t = line.trimmingCharacters(in: .whitespaces)
-                if (t.hasPrefix("#include \"") || t.hasPrefix("#import \"")) { continue }
+                if t.hasPrefix("#include \"") || t.hasPrefix("#import \"") { continue }
                 out += line + "\n"
             }
             out += "\n"
@@ -329,7 +314,7 @@ public final class SplatRenderer: @unchecked Sendable {
     static func makeRuntimeLibrary(device: MTLDevice) throws -> MTLLibrary {
         let options = MTLCompileOptions()
         options.mathMode = .fast
-        return try device.makeLibrary(source: try runtimeShaderSource(), options: options)
+        return try device.makeLibrary(source: runtimeShaderSource(), options: options)
     }
 
     // MARK: - Chunk Management

@@ -22,10 +22,11 @@ run_xcodebuild() {
     xcodebuild "$@" >"$log" 2>&1
     local status=$?
     set -e
-    grep -E "error:|warning: .*(DirectorCore|DirectorApp|DirectorCLI|CaptureApp|Shared)/|Test Suite|Test Case .*(passed|failed)|Executed|\*\* .* \*\*" "$log" | grep -v "^$" || true
+    # Compiler diagnostics of our own code, test results and the final verdict.
+    grep -E "^/.*: (error|warning): |Test Suite|Test Case .*(passed|failed)|error: -\[|XCTAssert|Executed|^\*\* .* \*\*|^Testing failed|^\t" "$log" \
+        | grep -v "/Apps/Vendor/\|/SourcePackages/\|Pruning\|^\t[A-Za-z]*Compile\|^\tBuilding" | awk '!seen[$0]++' || true
     if [ $status -ne 0 ]; then
-        echo "xcodebuild failed ($status), last 40 lines of $log:" >&2
-        tail -40 "$log" >&2
+        echo "xcodebuild failed with status $status (full log: $log)" >&2
     fi
     return $status
 }

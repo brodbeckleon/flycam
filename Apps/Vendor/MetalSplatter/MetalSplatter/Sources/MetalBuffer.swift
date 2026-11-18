@@ -3,7 +3,7 @@ import Metal
 import os
 
 fileprivate let log =
-    Logger(subsystem: Bundle.module.bundleIdentifier ?? "MetalSplatter",
+    Logger(subsystem: "com.metalsplatter.MetalSplatter", // FlyCam patch: no resource bundle
            category: "MetalBuffer")
 
 public class MetalBuffer<T>: @unchecked Sendable {

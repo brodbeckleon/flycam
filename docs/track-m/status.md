@@ -6,7 +6,7 @@ Branch `track-m`, merged with `origin/track-l` before every scope item.
 | # | Scope item | Status | Notes |
 |---|---|---|---|
 | 1 | Skeleton (XcodeGen project, targets, scripts) | done | |
-| 2 | Renderer | todo | |
+| 2 | Renderer | done | offscreen; tests (a) and (b) |
 | 3 | RecordedSource | todo | |
 | 4 | Transition + `director-cli render-transition` | todo | |
 | 5 | CaptureApp | todo | |
@@ -33,3 +33,33 @@ and installing it is not allowed for this track. Therefore:
 - DirectorCore's own shaders are Swift string constants compiled at runtime with `makeLibrary(source:)`.
 
 With the toolchain installed, project.yml can point back at the upstream URL with `exactVersion: 1.0.1`.
+
+## 2. Renderer (Phases 0 and 4)
+
+`Apps/DirectorCore/Rendering/`, all offscreen (no window, no drawable):
+
+- `SplatScene`: loads `.ply` (3DGS layout; also `.splat`/`.spz`) with MetalSplatter's SplatIO, renders with
+  `SplatRenderer` into `SplatRenderTargets` (colour rgba16Float linear premultiplied, depth32Float NDC depth).
+  Camera = FlyCamKit `PinholeCamera`: view = `c2w.rigidInverse`, projection = `PinholeCamera.projectionMatrix`
+  built from fx, fy, cx, cy (off-centre frustum, plan.md section 5).
+- Depth: MetalSplatter's high-quality depth path stores the alpha-weighted NDC depth; DirectorCore's compute pass
+  `linearizeDepth` converts it to metric depth along the viewing axis in an r32Float texture (0 = no content),
+  readable by any later pass and exportable as `.f32` (`Readback.writeF32`, docs/protocol.md 2.5a). No fork needed.
+- `renderSettled`: waits for a MetalSplatter depth sort made for exactly this camera (deterministic offline frames).
+- `Compositor`: video frame pass (BGRA pixel buffer via `CVMetalTextureCache`, sampled as sRGB, resampled into a
+  linear layer) and mix pass (`wA * videoA + wR * (splat over background) + wB * videoB`) into a bgra8 sRGB target.
+- `GaussianPLY`: writer for 3DGS PLY files (generated fixtures).
+
+Tests (`Apps/DirectorCoreTests/RendererTests.swift`, `CompositorTests.swift`), 1280x720, fx 1100, fy 1000,
+cx 703.25, cy 301.75 (principal point 64 px / 58 px off centre), 20 Gaussians from 1.2 m to 9 m incl. near corners,
+written to PLY and loaded through MetalSplatter:
+
+| Test | Threshold | Measured |
+|---|---|---|
+| (a) alpha centroid vs. plan.md section 5 projection | < 1 px | worst 0.007 px |
+| (b) metric depth read back at the projected pixel | < 2 % | worst 0.002 % |
+| video + mix pass at wA = 1 / wB = 1 reproduces the frame | <= 1 LSB | passes |
+| 50/50 mix equals the linear-light average | < 1.01 LSB | passes |
+
+Request for track-l (not blocking): FlyCamKit `BlendWeights` has no public initialiser; DirectorCore uses its
+own `MixWeights` (initialisable from `BlendWeights`).

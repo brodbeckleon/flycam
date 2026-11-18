@@ -14,12 +14,14 @@ so the unmodified package cannot be built here.
 
 1. `Package.swift`: only the `PLYIO`, `SplatIO` and `MetalSplatter` targets (no tests, sample renderer,
    converter or swift-argument-parser); `spz-swift` pinned to exactly 2.1.0.
-2. `MetalSplatter/Resources/*` moved to `MetalSplatter/Shaders/*.txt` and copied as resources instead of
-   compiled.
-3. `SplatRenderer.init`: if `makeDefaultLibrary(bundle:)` fails (no precompiled library), concatenate the
-   shader sources (`ShaderCommon.h`, `SplatProcessing.h`, `SplatProcessing.metal`,
-   `SingleStageRenderPath.metal`, `MultiStageRenderPath.metal`, local includes removed) and compile them
-   with `MTLDevice.makeLibrary(source:options:)` (fast math, as upstream's build setting).
+2. `MetalSplatter/Resources/*` (the shaders) are embedded verbatim as string constants in
+   `MetalSplatter/Sources/EmbeddedShaderSources.swift`; the target has no resources. With resources, Xcode
+   copies `MetalSplatter_MetalSplatter.bundle` into apps and test bundles but not into the DirectorCore
+   framework that links MetalSplatter statically, so `Bundle.module` crashed in the tests.
+3. `SplatRenderer.init` concatenates the shader sources (`ShaderCommon.h`, `SplatProcessing.h`,
+   `SplatProcessing.metal`, `SingleStageRenderPath.metal`, `MultiStageRenderPath.metal`, local includes removed)
+   and compiles them with `MTLDevice.makeLibrary(source:options:)` (fast math, as upstream's build setting).
+4. The loggers in `SplatRenderer` and `MetalBuffer` use a fixed subsystem instead of `Bundle.module.bundleIdentifier`.
 
 No change to the rendering itself. Depth output was already available upstream: `render(...depthTexture:)`
 stores the alpha-weighted NDC depth of the splats (high-quality depth path) with store action `.store`, so

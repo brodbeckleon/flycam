@@ -32,9 +32,8 @@ let package = Package(
             name: "MetalSplatter",
             dependencies: ["PLYIO", "SplatIO"],
             path: "MetalSplatter",
-            sources: ["Sources"],
-            // Shader sources are copied, not compiled: they are compiled at runtime (VENDORED.md).
-            resources: [.copy("Shaders")]
+            // Shader sources are embedded in Sources/EmbeddedShaderSources.swift and compiled at runtime (VENDORED.md).
+            sources: ["Sources"]
         ),
     ],
     swiftLanguageModes: [.v6]
