@@ -1,0 +1,159 @@
+# XcodeGen spec for the FlyCam apps (Track M). Generate with scripts/generate.sh,
+# never edit the generated .pbxproj by hand. The project is written to Apps/FlyCam.xcodeproj
+# and is git-ignored (Apps/.gitignore).
+name: FlyCam
+
+options:
+  bundleIdPrefix: ch.flycam
+  deploymentTarget:
+    macOS: "15.0"
+    iOS: "18.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    SWIFT_STRICT_CONCURRENCY: minimal
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+
+packages:
+  FlyCamKit:
+    path: Packages/FlyCamKit
+  # MetalSplatter 1.0.1, vendored because the Metal Toolchain is not installed (Apps/Vendor/MetalSplatter/VENDORED.md).
+  MetalSplatter:
+    path: Apps/Vendor/MetalSplatter
+
+targets:
+  DirectorCore:
+    type: framework
+    platform: macOS
+    sources:
+      - path: Apps/DirectorCore
+      - path: Apps/Shared
+    dependencies:
+      - package: FlyCamKit
+        product: FlyCamKit
+      - package: MetalSplatter
+        product: MetalSplatter
+      - package: MetalSplatter
+        product: SplatIO
+      - sdk: Metal.framework
+      - sdk: MetalKit.framework
+      - sdk: AVFoundation.framework
+      - sdk: VideoToolbox.framework
+      - sdk: CoreVideo.framework
+      - sdk: Network.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ch.flycam.DirectorCore
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+        MTL_LANGUAGE_REVISION: Metal32
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks @loader_path/Frameworks @executable_path"
+
+  DirectorCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Apps/DirectorCoreTests
+    dependencies:
+      - target: DirectorCore
+      - package: FlyCamKit
+        product: FlyCamKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ch.flycam.DirectorCoreTests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+
+  DirectorApp:
+    type: application
+    platform: macOS
+    sources:
+      - path: Apps/DirectorApp
+    dependencies:
+      - target: DirectorCore
+      - package: FlyCamKit
+        product: FlyCamKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ch.flycam.DirectorApp
+        PRODUCT_NAME: DirectorApp
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "FlyCam receives the camera streams of the phones on the local network."
+        INFOPLIST_KEY_NSBonjourServices: "_flycam._tcp"
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: NO
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
+
+  director-cli:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Apps/DirectorCLI
+    dependencies:
+      - target: DirectorCore
+      - package: FlyCamKit
+        product: FlyCamKit
+    settings:
+      base:
+        PRODUCT_NAME: director-cli
+        CODE_SIGN_IDENTITY: "-"
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path @executable_path/../Frameworks"
+
+  CaptureApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: Apps/CaptureApp
+      - path: Apps/Shared
+    dependencies:
+      - package: FlyCamKit
+        product: FlyCamKit
+      - sdk: ARKit.framework
+      - sdk: AVFoundation.framework
+      - sdk: VideoToolbox.framework
+      - sdk: Network.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ch.flycam.CaptureApp
+        PRODUCT_NAME: CaptureApp
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: FlyCam
+        INFOPLIST_KEY_NSCameraUsageDescription: "FlyCam films the scene and tracks the phone's position with ARKit."
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "FlyCam streams video and camera pose to the Director Mac on the local network."
+        INFOPLIST_KEY_NSBonjourServices: "_flycam._tcp"
+        INFOPLIST_KEY_UIRequiredDeviceCapabilities: arkit
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIFileSharingEnabled: YES
+        INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace: YES
+        INFOPLIST_KEY_UIStatusBarHidden: YES
+
+schemes:
+  DirectorCore:
+    build:
+      targets:
+        DirectorCore: all
+        DirectorCoreTests: [test]
+    test:
+      targets:
+        - DirectorCoreTests
+  DirectorApp:
+    build:
+      targets:
+        DirectorApp: all
+  director-cli:
+    build:
+      targets:
+        director-cli: all
+  CaptureApp:
+    build:
+      targets:
+        CaptureApp: all
