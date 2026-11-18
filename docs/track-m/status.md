@@ -8,7 +8,7 @@ Branch `track-m`, merged with `origin/track-l` before every scope item.
 | 1 | Skeleton (XcodeGen project, targets, scripts) | done | |
 | 2 | Renderer | done | offscreen; tests (a) and (b) |
 | 3 | RecordedSource | done | |
-| 4 | Transition + `director-cli render-transition` | todo | |
+| 4 | Transition + `director-cli render-transition` | done | test (c); headless CLI run in test_mac.sh |
 | 5 | CaptureApp | todo | |
 | 6 | Streaming | todo | |
 | 7 | docs/track-m/manual-tests.md | todo | |
@@ -85,3 +85,40 @@ own `MixWeights` (initialisable from `BlendWeights`).
 Tests (`RecordedSourceTests`): every one of 60 frames served by timestamp (with +-0.4 frame jitter) decodes to the
 right frame (stamped index read back from the HEVC frame); backward and random access; clamping; tie rule; two
 sessions aligned on the Mac clock; pose override and the other time bases; frame count mismatch rejected.
+
+## 4. Transition (Phase 4)
+
+`Apps/DirectorCore/Transition/`:
+
+- `TransitionController`: preview/program workflow (select preview, take; preview locked in flight; on landing B
+  becomes program and A preview). Path = FlyCamKit `TransitionPath` (interest point with fallbacks, orbit, slerp,
+  log-space focal length, floor guard, smootherstep, 15 % fades), rebuilt every frame from the latest poses. Landing
+  timestamps within 1 us of T are snapped.
+- `ProgramRenderer`: video state = video pass + mix (untouched video); flight = splat from the virtual camera
+  (`renderSettled` offline, latest sort live) + video passes + mix with the FlyCamKit blend weights.
+- `OfflineTransition` + `director-cli render-transition <sessionA> <sessionB> <splat.ply> --out <file.mp4>`:
+  timeline pre (0.5 s) + T (1.2 s) + post (0.5 s) on the Mac clock when both sessions have a clock offset, else
+  from each session's first frame; HEVC MP4 plus `<file.mp4>.json` per-frame log (u, s, weights, source frames,
+  virtual camera, interest point). No window, runs from a shell.
+- `TransitionVerification` + `director-cli verify-transition`: scope test (c) checks, also used by the XCTest.
+- Other CLI commands: `make-fixture`, `render-frame` (PNG + `.f32` depth for the Phase 3 refine_pose export), `inspect`.
+
+Colour finding: untagged BGRA buffers let VideoToolbox guess the colour space (SMPTE-C primaries, BT.601 matrix at
+640x360), which cost about 10 dB PSNR per re-encode (34.5 dB instead of 45 dB in an isolated test). All buffers
+DirectorCore creates and all files SessionVideoWriter writes are now tagged Rec. 709.
+
+Test (c) (`TransitionTests`, also run through the CLI by `scripts/test_mac.sh`), generated two-camera fixture
+(640x360, 60 frames at 30 fps, different phone clocks on one Mac clock):
+
+| Check | Threshold | Measured |
+|---|---|---|
+| first output frame vs. source A frame | > 35 dB | 72.0 dB |
+| take frame (s = 0) vs. source A frame | > 35 dB | 72.4 dB |
+| landing frame (s = 1) vs. source B frame | > 35 dB | 63.4 dB |
+| last output frame vs. source B frame | > 35 dB | 63.3 dB |
+| middle frame (s = 0.5): pixels differing from the empty background | > 50 % | 100 % |
+| middle frame vs. direct splat render from the logged virtual camera | > 30 dB | 45.9 dB |
+| middle frame vs. video A / video B | at least 3 dB below the render | 10.7 / 10.9 dB |
+
+Also: virtual camera at the take equals camera A exactly; weights are video A only before the take, video B only
+after landing; controller and floor-guard unit tests.

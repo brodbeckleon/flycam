@@ -114,5 +114,14 @@ public func makeBGRAPixelBuffer(width: Int, height: Int) throws -> CVPixelBuffer
     var pb: CVPixelBuffer?
     let st = CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA, attrs as CFDictionary, &pb)
     guard st == kCVReturnSuccess, let p = pb else { throw RenderError.resourceCreation("pixel buffer (\(st))") }
+    tagRec709(p)
     return p
+}
+
+/// Rec. 709 colour tags, as on HD camera frames and as SessionVideoWriter writes them. Untagged buffers let
+/// VideoToolbox guess the colour space and shift colours on every encode.
+public func tagRec709(_ pb: CVPixelBuffer) {
+    CVBufferSetAttachment(pb, kCVImageBufferColorPrimariesKey, kCVImageBufferColorPrimaries_ITU_R_709_2, .shouldPropagate)
+    CVBufferSetAttachment(pb, kCVImageBufferTransferFunctionKey, kCVImageBufferTransferFunction_ITU_R_709_2, .shouldPropagate)
+    CVBufferSetAttachment(pb, kCVImageBufferYCbCrMatrixKey, kCVImageBufferYCbCrMatrix_ITU_R_709_2, .shouldPropagate)
 }

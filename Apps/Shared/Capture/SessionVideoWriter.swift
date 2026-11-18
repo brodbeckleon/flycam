@@ -34,13 +34,15 @@ public final class SessionVideoWriter {
     /// - Parameters:
     ///   - bitRate: bits per second (default 20 Mbit/s at 1080p, plan Phase 5 range).
     ///   - fps: expected frame rate, also used for the keyframe interval (1 s).
-    public init(url: URL, width: Int, height: Int, fps: Double, bitRate: Int? = nil, quality: Double? = nil) throws {
+    ///   - fileType: `.mov` for session folders, `.mp4` for program output.
+    public init(url: URL, width: Int, height: Int, fps: Double, bitRate: Int? = nil, quality: Double? = nil,
+                fileType: AVFileType = .mov, codec: AVVideoCodecType = .hevc) throws {
         self.url = url
         self.width = width
         self.height = height
         try? FileManager.default.removeItem(at: url)
         do {
-            writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+            writer = try AVAssetWriter(outputURL: url, fileType: fileType)
         } catch {
             throw SessionVideoWriterError.cannotStart(String(describing: error))
         }
@@ -55,7 +57,14 @@ public final class SessionVideoWriter {
             compression[AVVideoAverageBitRateKey] = bitRate ?? Int(20_000_000 * Double(width * height) / (1920 * 1080))
         }
         let settings: [String: Any] = [
-            AVVideoCodecKey: AVVideoCodecType.hevc,
+            // Explicit Rec. 709 tags. Untagged input made the encoder and decoder guess (SD: SMPTE-C / 601) and
+            // cost about 10 dB PSNR per re-encode (docs/track-m/status.md, item 4).
+            AVVideoColorPropertiesKey: [
+                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
+            ],
+            AVVideoCodecKey: codec,
             AVVideoWidthKey: width,
             AVVideoHeightKey: height,
             AVVideoCompressionPropertiesKey: compression,
