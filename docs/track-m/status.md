@@ -9,7 +9,8 @@ Branch `track-m`, merged with `origin/track-l` before every scope item.
 | 2 | Renderer | done | offscreen; tests (a) and (b) |
 | 3 | RecordedSource | done | |
 | 4 | Transition + `director-cli render-transition` | done | test (c); headless CLI run in test_mac.sh |
-| 5 | CaptureApp | todo | |
+| 5a | CaptureApp: code, iOS build, phone-side logic tested on the Mac | done | |
+| 5b | CaptureApp: behaviour on an iPhone (ARKit, camera lock, recording, scan, relocalisation, export) | blocked | needs an iPhone and the real room; never installed on a device from this track (docs/track-m/manual-tests.md, Phases 0, 1, 3) |
 | 6 | Streaming | todo | |
 | 7 | docs/track-m/manual-tests.md | todo | |
 
@@ -122,3 +123,30 @@ Test (c) (`TransitionTests`, also run through the CLI by `scripts/test_mac.sh`),
 
 Also: virtual camera at the take equals camera A exactly; weights are video A only before the take, video B only
 after landing; controller and floor-guard unit tests.
+
+## 5. CaptureApp (Phases 1 and 3)
+
+iOS 18 app `Apps/CaptureApp` (SwiftUI), built with `scripts/build_ios.sh` (generic/platform=iOS,
+`CODE_SIGNING_ALLOWED=NO`), never installed on a device:
+
+- `CaptureModel`: `ARWorldTrackingConfiguration` with gravity alignment, video format chosen by `VideoFormatChooser`
+  (16:9, then 60 fps, then closest to 1080p), autofocus off, frames on a serial queue, on-screen pose, tracking state
+  (with reason), world mapping status, thermal state, measured fps and `CACurrentMediaTime() - ARFrame.timestamp`
+  (timebase check of plan.md Phase 1). Screen stays awake.
+- `CameraControl`: `configurableCaptureDeviceForPrimaryCamera`: lock current exposure / white balance / focus, or
+  manual ISO, shutter, temperature and tint (UI sheet; also used for `set_camera_settings` from the Mac).
+- Clip recording: `SessionRecorder` (Apps/Shared) writes `video.mov` (HEVC from `capturedImage`), `frames.jsonl`
+  (FlyCamKit `FramesWriter`, flushed per line) and `meta.json` (camera settings, floor_y of the loaded scan, clock offset
+  when triggered by the Mac).
+- Scan mode: horizontal plane detection; stills to `images/00000.jpg ...` when moved >= 10 cm or turned >= 8 degrees and
+  angular speed <= 30 deg/s with normal tracking (`ScanKeyframeSelector`); floor = largest plane classified as floor,
+  else largest horizontal plane >= 0.5 m below the lowest camera (`FloorEstimator`); at the end waits up to 60 s for
+  `worldMappingStatus == .mapped`, archives the `ARWorldMap` to `worldmap.bin` and its feature points to `points.ply`
+  (binary PLY per docs/protocol.md 2.4, coloured with the luminance of the last frame).
+- Live mode: loads a scan's `worldmap.bin` as `initialWorldMap` (and its floor_y), shows the relocalisation state.
+- Export: session list with share sheet (AirDrop, Files); session folders are in Documents/Sessions and visible in
+  Files/Finder (`UIFileSharingEnabled`). Info.plist: camera, local network and Bonjour keys, landscape right only.
+
+Tested on the Mac (`CaptureLogicTests`, the same source files as the app): ARKit matrix/intrinsics conversion,
+keyframe rule (10 cm, 8 degrees, fast rotation, tracking), floor choice, points.ply format and round trip, naming,
+video format choice, a recorded clip session opens as `RecordedSource` with the right frames, scan session files.
