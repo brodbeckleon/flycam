@@ -21,6 +21,8 @@ Usage:
       Renders the splat from the pose and intrinsics of frame i (Phase 3 overlay / refine_pose export).
   director-cli inspect <session>
       Prints a summary of a session folder.
+  director-cli bench [--gaussians 1500000] [--width 1920] [--height 1080] [--frames 120]
+      Offscreen render speed (splat pass + depth pass + mix) of a generated splat with an orbiting camera.
 """
 
 struct Args {
@@ -154,6 +156,48 @@ func run() async throws -> Int32 {
         if let r = s.availableTimes { print("time      \(r.lowerBound) ... \(r.upperBound) (\(s.timeBase))") }
         print("floor_y   \(s.floorY.map { String($0) } ?? "null")  clock_offset \(s.meta.clockOffset.map { String($0) } ?? "null")")
         print("override  \(s.poseOverride != nil ? "pose_override.json" : "none")")
+        return 0
+
+    case "bench":
+        let n = Int(try args.double("gaussians") ?? 1_500_000)
+        let w = Int(try args.double("width") ?? 1920), h = Int(try args.double("height") ?? 1080)
+        let frames = Int(try args.double("frames") ?? 120)
+        let ctx = try MetalContext.shared()
+        // Gaussians spread through a 6 x 3 x 6 m room volume, small and fairly opaque (worst case for overdraw is a
+        // trained splat; this measures throughput).
+        var rng = SystemRandomNumberGenerator()
+        var gs = [Gaussian]()
+        gs.reserveCapacity(n)
+        for _ in 0..<n {
+            let p = SIMD3<Float>(Float.random(in: -3...3, using: &rng), Float.random(in: -1.3...1.5, using: &rng), Float.random(in: -4...2, using: &rng))
+            gs.append(Gaussian(position: p, color: SIMD3(Float.random(in: 0...1, using: &rng), 0.5, 0.5), opacity: 0.6,
+                               radius: Float.random(in: 0.005...0.03, using: &rng)))
+        }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("flycam-bench.ply")
+        try GaussianPLY.write(gs, to: url)
+        let scene = try await SplatScene.load(url: url, context: ctx)
+        try? FileManager.default.removeItem(at: url)
+        let targets = try SplatRenderTargets(context: ctx, width: w, height: h)
+        let comp = try Compositor(context: ctx)
+        let out = try ctx.makeTexture(.bgra8Unorm_srgb, width: w, height: h, usage: [.renderTarget, .shaderRead])
+        let k = Intrinsics(fx: Double(w) * 0.75, fy: Double(w) * 0.75, cx: Double(w) / 2 + 12.5, cy: Double(h) / 2 - 7.5, width: w, height: h)
+        var times = [Double]()
+        var skipped = 0
+        for i in 0..<(frames + 10) {
+            let a = Double(i) * 0.02
+            let cam = PinholeCamera(intrinsics: k, c2w: Mat4.lookAt(eye: Vec3(3.5 * sin(a), 0.2, -1 + 3.5 * cos(a)), target: Vec3(0, -0.3, -1)))
+            let t0 = MonotonicClock.now()
+            let cb = ctx.queue.makeCommandBuffer()!
+            if !(try scene.encode(camera: cam, targets: targets, commandBuffer: cb)) { skipped += 1 }
+            comp.encodeMix(videoA: nil, render: targets, videoB: nil, weights: .renderOnly, output: out, commandBuffer: cb)
+            try ctx.commitAndWait(cb)
+            if i >= 10 { times.append(MonotonicClock.now() - t0) }
+        }
+        times.sort()
+        let mean = times.reduce(0, +) / Double(times.count)
+        print(String(format: "bench: %d Gaussians, %dx%d, %d frames: mean %.2f ms, median %.2f ms, p95 %.2f ms (%.0f fps at the mean), %d skipped by MetalSplatter",
+                     scene.splatCount, w, h, times.count, mean * 1000, times[times.count / 2] * 1000,
+                     times[Int(Double(times.count) * 0.95)] * 1000, 1 / mean, skipped))
         return 0
 
     case "-h", "--help", "help":
