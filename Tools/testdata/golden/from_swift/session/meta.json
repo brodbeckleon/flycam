@@ -1,0 +1,22 @@
+{
+  "camera_id" : 1,
+  "camera_settings" : {
+    "iso" : 100,
+    "locked" : true,
+    "shutter" : 0.008333333333333333,
+    "wb_temperature" : 5000,
+    "wb_tint" : 0
+  },
+  "clock_offset" : 1234.5678,
+  "created" : "2026-11-17T19:00:00Z",
+  "device_model" : "iPhone15,2",
+  "floor_y" : -1.32,
+  "format_version" : 1,
+  "kind" : "clip",
+  "os_version" : "18.1",
+  "video_format" : {
+    "fps" : 60,
+    "height" : 1080,
+    "width" : 1920
+  }
+}
