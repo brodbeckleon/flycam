@@ -7,7 +7,7 @@ Branch `track-m`, merged with `origin/track-l` before every scope item.
 |---|---|---|---|
 | 1 | Skeleton (XcodeGen project, targets, scripts) | done | |
 | 2 | Renderer | done | offscreen; tests (a) and (b) |
-| 3 | RecordedSource | todo | |
+| 3 | RecordedSource | done | |
 | 4 | Transition + `director-cli render-transition` | todo | |
 | 5 | CaptureApp | todo | |
 | 6 | Streaming | todo | |
@@ -63,3 +63,25 @@ written to PLY and loaded through MetalSplatter:
 
 Request for track-l (not blocking): FlyCamKit `BlendWeights` has no public initialiser; DirectorCore uses its
 own `MixWeights` (initialisable from `BlendWeights`).
+
+## 3. RecordedSource
+
+`Apps/DirectorCore/Sources/`:
+
+- `FrameSource` protocol (plan.md section 4): `frame(nearest:)` returns a `SourceFrame` (index, time, phone time,
+  `PinholeCamera`, tracking, 32BGRA pixel buffer). Nearest-frame rule with ties to the earlier frame
+  (docs/protocol.md 4).
+- `RecordedSource`: reads `meta.json`, `frames.jsonl` (FlyCamKit `SessionIO`, validated with `SessionValidation`)
+  and `pose_override.json`; decodes `video.mov` with `VideoFileReader` (AVAssetReader, BGRA, sequential with seeks
+  by sample presentation time; video frame i = line i). Time bases: Mac clock (`t + clock_offset`, default when
+  meta.json has an offset), phone clock, or seconds since the first frame. Rejects a video/metadata frame count mismatch.
+- `Apps/Shared/Capture/SessionVideoWriter.swift`: HEVC `video.mov` writer (no frame reordering, keyframe every 1 s),
+  shared by the CaptureApp recorder and the fixture generator.
+- Fixtures (`Apps/DirectorCore/Fixtures/`): `SyntheticRoom` (about 60k flat Gaussians: checkerboard floor, striped walls,
+  two boxes), `SyntheticSession` (renders tripod clips from the splat, HEVC, with the frame index stamped as 16
+  black/white squares by `FrameCode`, plus meta.json/frames.jsonl), two-camera fixture with different phone clocks
+  on one Mac clock.
+
+Tests (`RecordedSourceTests`): every one of 60 frames served by timestamp (with +-0.4 frame jitter) decodes to the
+right frame (stamped index read back from the HEVC frame); backward and random access; clamping; tie rule; two
+sessions aligned on the Mac clock; pose override and the other time bases; frame count mismatch rejected.
