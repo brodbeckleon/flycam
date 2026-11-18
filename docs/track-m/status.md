@@ -14,7 +14,7 @@ that is not on track-l yet; **blocked** = needs something this Mac cannot provid
 | 4 | Transition + `director-cli render-transition` | done | test (c); headless CLI run in test_mac.sh |
 | 5a | CaptureApp: code, iOS build, phone-side logic tested on the Mac | done | |
 | 5b | CaptureApp: behaviour on an iPhone (ARKit, camera lock, recording, scan, relocalisation, export) | blocked | needs an iPhone and the real room; never installed on a device from this track (docs/track-m/manual-tests.md, Phases 0, 1, 3) |
-| 6a | Streaming: encoder, packets, control channel, clock sync, decoder, frame store, LiveSource, loopback test | done | test (d) |
+| 6a | Streaming: encoder, packets, control channel, clock sync, decoder, frame store, LiveSource, loopback test | done | test (d); fly-through between two live loopback sources |
 | 6b | Streaming: Bonjour discovery between devices, Wi-Fi latency / sync, 15 min stability | blocked | needs the phones, the access point and the real room; Bonjour is not exercised by automated tests because advertising may trigger the macOS local network permission prompt (a GUI window) |
 | 7 | docs/track-m/manual-tests.md | done | per phase 0-5, with the Track M commands and buttons |
 
@@ -212,6 +212,7 @@ synthetic room renders with the frame index stamped, phone clock = Mac clock - 1
 | LiveSource: 0.5 s window, nearest frame, pose and intrinsics from the header | | passes |
 | control: set_camera_settings, start_recording (name, offset), stop_recording, acks, status, >= 10 pongs | | passes |
 | second test: stable camera ids per device across reconnects, media before hello and bad preamble rejected | | passes |
+| `LiveTransitionTests`: two loopback phones (offsets +250 s / -77.25 s) streaming the tripod views; nearest-frame pairing residual; flight between the two LiveSources | residual < 1 frame; take/landing = live video (> 45 dB); mid-flight = splat render (> 30 dB) | 8.5 ms; identical; identical |
 
 Finding: a synthetic pattern with saturated 16 px red/blue checks decoded at 23.7 dB with no colour bias (4:2:0 chroma
 subsampling); the camera-like room content decodes at 43.6 dB, so the test uses room renders.
